@@ -1,4 +1,4 @@
-from machine import Pin, SPI, freq, PWM
+from machine import Pin, SPI, freq, PWM, UART
 import gc
 
 from drivers.ili93xx.ili9341 import ILI9341 as SSD
@@ -30,3 +30,8 @@ tpad.init(240, 320, 221, 315, 3873, 3915, True, True, True)
 display = Display(ssd, tpad)
 
 backlight=PWM(Pin(6), freq=2000, duty_u16=0)
+import network
+wlan=network.WLAN(network.WLAN.IF_STA)
+wlan.active(True)
+uart=UART(0, baudrate=9600, tx=Pin(16), rx=Pin(17))
+gps=UART(1, baudrate=9600, tx=Pin(4), rx=Pin(9))
