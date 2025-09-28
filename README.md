@@ -6,3 +6,6 @@
 - touch screen with ILI9341 display controller and XPT2046 touchpanel controller
 - and SD card slot
 - BNO055 9-axis gyro sensor
+
+## How to use?
+Please copy `main.py`, `hardware_setup.py`, `lib/` to Raspberrypi pico (micropython installed)'s root.
