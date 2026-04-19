@@ -9,7 +9,8 @@ This is the source code for Ecorun Logging system of front panel. This system is
 - [GPS Module](https://akizukidenshi.com/catalog/g/g117980/) (2025, 2026(planned))
 
 ## How to use?
-Please copy `main.py`, `hardware_setup.py`, `lib/` to Raspberrypi pico (micropython installed)'s root.
+Please copy `main.py`, `hardware_setup.py`, `lib/` to Raspberrypi pico (micropython installed)'s root.   
+For Development, please see [Wiki](./wiki)
 
 ## System Overview
 ### 2024 Overview
