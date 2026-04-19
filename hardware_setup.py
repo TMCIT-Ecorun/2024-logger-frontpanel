@@ -24,7 +24,7 @@ quiet()
 from touch.xpt2046 import XPT2046
 tirq = Pin(1, Pin.IN)
 tcs = Pin(5, Pin.OUT, value=1)
-tspi = SPI(0, baudrate=2_500_000, sck=Pin(2), mosi=Pin(3), miso=Pin(4))
+tspi = SPI(0, baudrate=2_500_000, sck=Pin(2), mosi=Pin(3), miso=Pin(0))
 tpad = XPT2046(tspi, tcs, ssd)
 tpad.init(240, 320, 221, 315, 3873, 3915, True, True, True)
 display = Display(ssd, tpad)

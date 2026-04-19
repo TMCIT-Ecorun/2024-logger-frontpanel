@@ -23,14 +23,12 @@ from gui.widgets import (
 )
 
 import uasyncio as asyncio
-import gc
-import machine
-from tinyframe import TinyFrame
-import json
+import machine, json, time
+#from tinyframe import TinyFrame
 from async_websocket_client import AsyncWebsocketClient
 #from rp2 import PIO, asm_pio, StateMachine
 from network import STAT_GOT_IP, STAT_CONNECTING
-import binascii
+#import binascii, gc
 
 try:
     with open("config.json","r") as f:
@@ -67,21 +65,34 @@ class MainScreen(Screen):
         self.warn_label = Label(self.wri20, 10, 240, text="WARN", **label_conf)
         #self.afr_value = Label(self.wri23, 50, 30, text="14.7", **label_conf)
         #self.rpm_value = Label(self.wri23, 130, 30, text="2700", **label_conf)
-        self.speed_value = Label(self.wri23, 100, 130, text="20", **label_conf)
+        self.speed_value = Label(self.wri23, 100, 130, text="0.000", **label_conf)
         self.warn_value = Textbox(self.wri17, 30, 220, 90, 12, bdcolor=GREEN, **label_conf)
         self.setting_btn = Button(self.wri20, 200, 30, **label_conf, text="Setting", height=30, litcolor=BLUE, callback=lambda bt: Screen.change(SettingScreen))
         self.wss=AsyncWebsocketClient(200)
         self.uart = machine.UART(0, 115200, tx=machine.Pin(16), rx=machine.Pin(17), rxbuf=1)
         #self.uart_reader = asyncio.StreamReader(self.uart)
         #self.uart_frame = TinyFrame()
+        asyncio.create_task(self.pong_loop())
         asyncio.create_task(self.loop())
         self.wifi_con=False
         self.wss_con=False
+    def showWarn(self, warn_num, text):
+        self.warn_value.lines
+    async def pong_loop(self):
+        while 1:
+            if self.wss_con:
+                await self.wss.recv()
+            await asyncio.sleep_ms(100)
     async def loop(self):
         gpsdata=b""
         speed=0
+        last_send=0
+        if "wifi_ssid" in config and not self.wifi_con:
+            hardware_setup.wlan.active(True)
+            hardware_setup.wlan.connect(config["wifi_ssid"], config["wifi_psk"])
+            print("Connecting wifi...")
         await asyncio.sleep_ms(3_000)
-        hardware_setup.gps.write(b'$PSRF106,21*0F\r\n')
+        #hardware_setup.gps.write(b'$PSRF106,21*0F\r\n')
         while 1:
             stat=hardware_setup.wlan.status()
             if stat==STAT_GOT_IP:
@@ -89,25 +100,26 @@ class MainScreen(Screen):
                     print("Wifi connected!")
                     self.wifi_con=True
                 if (not self.wss_con) or (not await self.wss.open()):
-                    print("WS connecting...")
+                    print("WS connecting...", end="")
                     try:
-                        self.wss_con=await self.wss.handshake("ws://marusoftware.net:8989/ws")
-                    except:
+                        self.wss_con=await self.wss.handshake("ws://192.168.0.123:5173/ws")
+                    except Exception as e:
                         self.wss_con=False
+                        print("error:", e)
                     if self.wss_con:
-                        print("WS connected!")
-            elif stat!=STAT_CONNECTING:
+                        print("connected!")
+            else:
                 print("WIFI reconnecting...")
                 hardware_setup.wlan.connect(config["wifi_ssid"], config["wifi_psk"])
                 self.wifi_con=False
-            await asyncio.sleep_ms(80)
-            #data = await self.uart_reader.readline()
-            uart_tmp=self.uart.read()
-            if uart_tmp is not None:
-                speed=int.from_bytes(uart_tmp, "big")
-                self.speed_value.value(str(speed))
-            else:
-                speed=-1
+            
+            await asyncio.sleep_ms(100)
+            #uart_tmp=self.uart.read()
+            #if uart_tmp is not None:
+            #    speed=int.from_bytes(uart_tmp, "big")
+            #    self.speed_value.value(str(speed))
+            #else:
+            #    speed=-1
             gps_tmp=hardware_setup.gps.readline()
             if gps_tmp is not None:
                 if gps_tmp[:1] == b'$':
@@ -116,31 +128,30 @@ class MainScreen(Screen):
                     gpsdata+=gps_tmp
                 if gpsdata[-2:] == b'\r\n':
                     try:
-                        gpsstr=gpsdata[:-2].decode()
+                        gpsstr=gpsdata[:-2].decode().split(",")
                     except UnicodeError:
-                        continue
-                    if not gpsstr.startswith("$GPGGA"):
-                        continue
-                    #print(gpsstr)
-                    self.speed_value.value(gpsdata.split(",")[8])
+                        pass
+                    else:
+                        if gpsstr[0] == "$GPRMC":
+                            try:
+                                speed=float(gpsstr[7]) * 1.852
+                                self.speed_value.value(str(speed))
+                            except ValueError:
+                                pass
 #                     if self.wss_con:
 #                         try:
 #                             await self.wss.send(gpsstr, speed)#, speed*3.6, difference))
 #                         except:
 #                             pass
-            if self.wss_con:
+            if self.wss_con and time.time()-last_send >= 1:
                 try:
-                    await self.wss.send("{} {}\n".format(speed))
+                    await self.wss.send("{} {}\n".format(speed, 0))
+                    last_send = time.time()
                 except:
-                    pass
+                    print("Websocket error. Would to be reconnect.")
+                    self.wss_con=False
             
             #print(data, speed*3.6, difference)
-    def on_open(self):
-        if "wifi_ssid" in config and not self.wifi_con:
-            hardware_setup.wlan.active(True)
-            hardware_setup.wlan.connect(config["wifi_ssid"], config["wifi_psk"])
-            print("Connecting wifi...")
-            
 
 def main():
     if ssd.height < 240 or ssd.width < 320:
